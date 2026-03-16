@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>RS ai</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #0f0d14;
+    --surface:    #17141f;
+    --surface2:   #211d2e;
+    --border:     #2e2840;
+    --lavender:   #b59dda;
+    --lav-dim:    #7c68a8;
+    --lav-glow:   rgba(181,157,218,.18);
+    --lav-soft:   rgba(181,157,218,.08);
+    --text:       #ece8f4;
+    --muted:      #7a6f90;
+    --white:      #f4f0fb;
+    --radius:     16px;
+    --radius-sm:  10px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 15px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* ambient glow */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 55% 35% at 15% 0%, rgba(181,157,218,.12) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 30% at 85% 100%, rgba(130,100,200,.10) 0%, transparent 60%);
+  }
+
+  /* ── App shell ── */
+  .app {
+    position: relative; z-index: 1;
+    height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    display: flex; flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 18px 20px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(15,13,20,.85);
+    backdrop-filter: blur(12px);
+    flex-shrink: 0;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 12px; }
+
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: linear-gradient(135deg, #7c5cbf, var(--lavender));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: bold; color: #fff; letter-spacing: .5px;
+    box-shadow: 0 0 16px rgba(181,157,218,.3);
+    font-family: Georgia, serif;
+    flex-shrink: 0;
+  }
+
+  .header-info h1 {
+    font-family: Georgia, serif;
+    font-size: 17px; font-weight: normal;
+    font-style: italic;
+    color: var(--lavender);
+    letter-spacing: .5px;
+    line-height: 1.1;
+  }
+
+  .status-dot {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--muted);
+  }
+
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #7bc97b;
+    box-shadow: 0 0 6px #7bc97b;
+    animation: pulse-dot 2.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .4; }
+  }
+
+  /* Notes toggle */
+  .notes-toggle {
+    background: var(--lav-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: var(--lav-dim);
+    font-family: Georgia, serif;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .notes-toggle:hover, .notes-toggle.active {
+    background: var(--lav-glow);
+    border-color: var(--lavender);
+    color: var(--lavender);
+  }
+
+  /* ── Tab bar ── */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .tab {
+    flex: 1; padding: 11px 8px;
+    text-align: center;
+    font-family: Georgia, serif;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .tab.active {
+    color: var(--lavender);
+    border-bottom-color: var(--lavender);
+    background: var(--lav-soft);
+  }
+
+  /* ── Panels ── */
+  .panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .panel.active { display: flex; }
+
+  /* ── CHAT PANEL ── */
+  .chat-messages {
+    flex: 1; overflow-y: auto;
+    padding: 16px 16px 8px;
+    display: flex; flex-direction: column; gap: 12px;
+    scroll-behavior: smooth;
+  }
+
+  .chat-messages::-webkit-scrollbar { width: 3px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* message bubbles */
+  .msg { display: flex; gap: 9px; animation: msgIn .28s ease both; }
+  .msg.user { flex-direction: row-reverse; }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; flex-shrink: 0; margin-top: 2px;
+  }
+
+  .msg.ai .msg-avatar {
+    background: linear-gradient(135deg, #7c5cbf, var(--lavender));
+    color: #fff;
+    font-family: Georgia, serif;
+    font-style: italic;
+  }
+
+  .msg.user .msg-avatar {
+    background: var(--surface2);
+    color: var(--muted);
+  }
+
+  .msg-bubble {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .msg.ai .msg-bubble {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-top-left-radius: 4px;
+    color: var(--text);
+  }
+
+  .msg.user .msg-bubble {
+    background: linear-gradient(135deg, #5a3f8a, #7c5cbf);
+    border-top-right-radius: 4px;
+    color: #f0ecfa;
+  }
+
+  .msg-time {
+    font-size: 10px; color: var(--muted);
+    margin-top: 4px;
+    text-align: right;
+  }
+  .msg.ai .msg-time { text-align: left; }
+
+  /* typing indicator */
+  .typing-indicator {
+    display: none; align-items: center; gap: 9px;
+    padding: 0 16px 8px;
+  }
+  .typing-indicator.show { display: flex; }
+
+  .typing-dots {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    border-top-left-radius: 4px;
+    padding: 10px 16px;
+    display: flex; gap: 5px; align-items: center;
+  }
+
+  .typing-dots span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--lav-dim);
+    animation: bounce .9s ease-in-out infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: .15s; }
+  .typing-dots span:nth-child(3) { animation-delay: .3s; }
+
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: .5; }
+    40%           { transform: translateY(-5px); opacity: 1; }
+  }
+
+  /* chat input */
+  .chat-input-row {
+    padding: 10px 12px 16px;
+    display: flex; gap: 8px; align-items: flex-end;
+    border-top: 1px solid var(--border);
+    background: rgba(15,13,20,.9);
+    flex-shrink: 0;
+  }
+
+  .chat-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--text);
+    font-family: Georgia, serif;
+    font-size: 14px;
+    padding: 10px 15px;
+    outline: none;
+    resize: none;
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.5;
+    transition: border-color .2s;
+  }
+  .chat-input:focus { border-color: var(--lavender); }
+  .chat-input::placeholder { color: var(--muted); }
+
+  .send-btn {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, #7c5cbf, var(--lavender));
+    border: none; color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+    transition: opacity .2s, transform .15s;
+    box-shadow: 0 2px 12px rgba(181,157,218,.3);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .send-btn:active { transform: scale(.92); }
+  .send-btn:disabled { opacity: .4; }
+
+  /* ── NOTES PANEL ── */
+  .notes-panel {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .notes-toolbar {
+    display: flex; gap: 8px; align-items: center;
+  }
+
+  .notes-toolbar input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: Georgia, serif;
+    font-size: 13px;
+    padding: 8px 12px;
+    outline: none;
+  }
+  .notes-toolbar input:focus { border-color: var(--lavender); }
+  .notes-toolbar input::placeholder { color: var(--muted); }
+
+  .btn-small {
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--lav-soft);
+    color: var(--lavender);
+    font-family: Georgia, serif;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-small:hover { background: var(--lav-glow); border-color: var(--lavender); }
+
+  .notes-textarea {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: Georgia, serif;
+    font-size: 14px;
+    line-height: 1.75;
+    padding: 14px 16px;
+    outline: none;
+    resize: none;
+    transition: border-color .2s;
+  }
+  .notes-textarea:focus { border-color: var(--lav-dim); }
+  .notes-textarea::placeholder { color: var(--muted); font-style: italic; }
+
+  .notes-footer {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .notes-hint { font-size: 11px; color: var(--muted); font-style: italic; }
+  .save-indicator {
+    font-size: 11px; color: #7bc97b;
+    opacity: 0; transition: opacity .4s;
+  }
+  .save-indicator.show { opacity: 1; }
+
+  /* ── CLEAR chat button ── */
+  .clear-btn {
+    background: none; border: none;
+    color: var(--muted); font-size: 11px; font-family: Georgia, serif;
+    padding: 4px 8px; cursor: pointer;
+    font-style: italic;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .clear-btn:hover { color: var(--lavender); }
+
+  .chat-header-row {
+    display: flex; justify-content: flex-end; align-items: center;
+    padding: 6px 14px 0;
+    flex-shrink: 0;
+  }
+
+  /* ── Welcome message ── */
+  .welcome {
+    text-align: center;
+    padding: 30px 20px 10px;
+    color: var(--muted);
+    font-style: italic;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .welcome strong { color: var(--lavender); font-style: normal; font-weight: normal; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="header-left">
+      <div class="avatar">RS</div>
+      <div class="header-info">
+        <h1>RS ai</h1>
+        <div class="status-dot"><div class="dot"></div> Online</div>
+      </div>
+    </div>
+    <button class="notes-toggle" id="notesToggle" onclick="switchTab('notes')">📝 Notes</button>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" id="tab-chat" onclick="switchTab('chat')">✦ Chat</div>
+    <div class="tab" id="tab-notes" onclick="switchTab('notes')">Notes</div>
+  </div>
+
+  <!-- CHAT PANEL -->
+  <div class="panel active" id="panel-chat">
+    <div class="chat-header-row">
+      <button class="clear-btn" onclick="clearChat()">clear conversation</button>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="welcome">
+        <strong>RS ai</strong> is your personal agent.<br/>
+        Ask me anything — strategy, writing,<br/>ideas, or just thinking out loud.
+      </div>
+    </div>
+
+    <div class="typing-indicator" id="typingIndicator">
+      <div class="msg-avatar" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#7c5cbf,#b59dda);display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-family:Georgia,serif;font-style:italic;flex-shrink:0;">RS</div>
+      <div class="typing-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="chatInput" placeholder="Message RS ai…" rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+
+  <!-- NOTES PANEL -->
+  <div class="panel" id="panel-notes">
+    <div class="notes-panel">
+      <div class="notes-toolbar">
+        <input type="text" id="notesTitle" placeholder="Note title…" oninput="autoSaveNotes()" />
+        <button class="btn-small" onclick="newNote()">+ New</button>
+      </div>
+      <textarea class="notes-textarea" id="notesText"
+        placeholder="Write anything here — thoughts, email drafts, ideas, templates…&#10;&#10;Everything saves automatically."
+        oninput="autoSaveNotes()"></textarea>
+      <div class="notes-footer">
+        <span class="notes-hint" id="notesCount">0 characters</span>
+        <span class="save-indicator" id="saveIndicator">✓ saved</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const GROQ_API_KEY = "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";
+const GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions";
+const STORAGE_CHAT  = "rsai_chat_history";
+const STORAGE_NOTES = "rsai_notes";
+
+// ── Conversation state ──
+let messages = [];   // [{role, content}]
+let isBusy   = false;
+
+const SYSTEM_PROMPT = `You are RS ai — a sharp, thoughtful personal AI agent. You're like a trusted advisor: direct, intelligent, warm but not sycophantic. You help with thinking through ideas, cold email strategy, writing, templates, feedback, and everyday tasks. You have a calm, slightly literary tone (you use Georgia font — you appreciate good writing). Keep responses concise unless depth is needed. Never start with "Certainly" or "Of course". Be real.`;
+
+// ── Load from localStorage ──
+function loadHistory() {
+  try {
+    const saved = localStorage.getItem(STORAGE_CHAT);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      messages = parsed.messages || [];
+      parsed.rendered?.forEach(r => renderBubble(r.role, r.content, r.time, false));
+    }
+  } catch(e) { messages = []; }
+}
+
+function saveHistory(renderedList) {
+  try {
+    localStorage.setItem(STORAGE_CHAT, JSON.stringify({ messages, rendered: renderedList }));
+  } catch(e) {}
+}
+
+// keep a rendered list in sync
+let rendered = [];
+
+function renderBubble(role, content, time, save = true) {
+  const container = document.getElementById("chatMessages");
+
+  // remove welcome msg on first real message
+  const welcome = container.querySelector(".welcome");
+  if (welcome) welcome.remove();
+
+  const wrap = document.createElement("div");
+  wrap.className = `msg ${role}`;
+
+  const avatarText = role === "ai" ? "RS" : "you";
+  wrap.innerHTML = `
+    <div class="msg-avatar">${avatarText}</div>
+    <div>
+      <div class="msg-bubble">${escapeHtml(content).replace(/\n/g, "<br/>")}</div>
+      <div class="msg-time">${time}</div>
+    </div>`;
+
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+
+  if (save) {
+    rendered.push({ role, content, time });
+    saveHistory(rendered);
+  }
+}
+
+function escapeHtml(t) {
+  return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function now() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+async function sendMessage() {
+  if (isBusy) return;
+  const input = document.getElementById("chatInput");
+  const text  = input.value.trim();
+  if (!text) return;
+
+  input.value = "";
+  autoResize(input);
+  isBusy = true;
+  document.getElementById("sendBtn").disabled = true;
+
+  // user bubble
+  renderBubble("user", text, now());
+  messages.push({ role: "user", content: text });
+
+  // typing
+  document.getElementById("typingIndicator").classList.add("show");
+  document.getElementById("chatMessages").scrollTop = 99999;
+
+  try {
+    const res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          ...messages
+        ],
+        max_tokens: 700,
+        temperature: 0.75
+      })
+    });
+
+    const data = await res.json();
+    const reply = data?.choices?.[0]?.message?.content?.trim() || "Something went wrong. Try again.";
+
+    messages.push({ role: "assistant", content: reply });
+    document.getElementById("typingIndicator").classList.remove("show");
+    renderBubble("ai", reply, now());
+
+  } catch(e) {
+    document.getElementById("typingIndicator").classList.remove("show");
+    renderBubble("ai", "Network error — please try again.", now());
+  }
+
+  isBusy = false;
+  document.getElementById("sendBtn").disabled = false;
+}
+
+function handleKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 120) + "px";
+}
+
+function clearChat() {
+  if (!confirm("Clear this conversation?")) return;
+  messages = [];
+  rendered = [];
+  localStorage.removeItem(STORAGE_CHAT);
+  const c = document.getElementById("chatMessages");
+  c.innerHTML = `<div class="welcome"><strong>RS ai</strong> is your personal agent.<br/>Ask me anything — strategy, writing,<br/>ideas, or just thinking out loud.</div>`;
+}
+
+// ── Tab switching ──
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  document.getElementById("tab-" + name).classList.add("active");
+  document.getElementById("panel-" + name).classList.add("active");
+  document.getElementById("notesToggle").classList.toggle("active", name === "notes");
+}
+
+// ── Notes ──
+let saveTimer = null;
+
+function autoSaveNotes() {
+  const title = document.getElementById("notesTitle").value;
+  const text  = document.getElementById("notesText").value;
+  document.getElementById("notesCount").textContent = text.length + " characters";
+
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(STORAGE_NOTES, JSON.stringify({ title, text }));
+      const ind = document.getElementById("saveIndicator");
+      ind.classList.add("show");
+      setTimeout(() => ind.classList.remove("show"), 1800);
+    } catch(e) {}
+  }, 600);
+}
+
+function loadNotes() {
+  try {
+    const saved = localStorage.getItem(STORAGE_NOTES);
+    if (saved) {
+      const { title, text } = JSON.parse(saved);
+      document.getElementById("notesTitle").value = title || "";
+      document.getElementById("notesText").value  = text  || "";
+      document.getElementById("notesCount").textContent = (text||"").length + " characters";
+    }
+  } catch(e) {}
+}
+
+function newNote() {
+  if (document.getElementById("notesText").value.trim()) {
+    if (!confirm("Start a new note? Current note will be saved.")) return;
+  }
+  autoSaveNotes();
+  document.getElementById("notesTitle").value = "";
+  document.getElementById("notesText").value  = "";
+  document.getElementById("notesCount").textContent = "0 characters";
+  document.getElementById("notesTitle").focus();
+}
+
+// ── Init ──
+loadHistory();
+loadNotes();
+</script>
+</body>
+</html>
